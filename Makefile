@@ -8,6 +8,8 @@ else
     BIN_EXT :=
 endif
 
+ANDROID_API_LEVEL ?= 21
+
 VERSION		?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT      ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 BUILD_TIME  ?= $(shell date -u '+%Y-%m-%d_%H:%M:%S')
@@ -173,19 +175,19 @@ illumos-amd64:
 
 android-amd64:
 	@mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-amd64 $(SRC_DIR)
+	CC=x86_64-linux-android$(ANDROID_API_LEVEL)-clang CGO_ENABLED=1 GOOS=android GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-amd64 $(SRC_DIR)
 
 android-386:
 	@mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-386 $(SRC_DIR)
+	CC=i686-linux-android$(ANDROID_API_LEVEL)-clang CGO_ENABLED=1 GOOS=android GOARCH=386 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-386 $(SRC_DIR)
 
 android-arm64:
 	@mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-arm64 $(SRC_DIR)
+	CC=aarch64-linux-android$(ANDROID_API_LEVEL)-clang CGO_ENABLED=1 GOOS=android GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-arm64 $(SRC_DIR)
 
 android-arm:
 	@mkdir -p $(OUTPUT_DIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-arm $(SRC_DIR)
+	CC=armv7a-linux-androideabi$(ANDROID_API_LEVEL)-clang CGO_ENABLED=1 GOOS=android GOARCH=arm go build -ldflags "$(LDFLAGS)" -o $(OUTPUT_DIR)/$(APP_NAME)-android-arm $(SRC_DIR)
 
 clean:
 	rm -rf $(OUTPUT_DIR)

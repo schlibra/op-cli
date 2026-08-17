@@ -32,11 +32,11 @@ func url() {
 }
 func login() {
 	if len(os.Args) >= 4 {
-		username := os.Args[3]
-		password := os.Args[4]
+		username := os.Args[2]
+		password := os.Args[3]
 		totp := ""
 		if len(os.Args) >= 5 {
-			totp = os.Args[5]
+			totp = os.Args[4]
 		}
 		data := utils.SendUserLogin(username, password, totp)
 		if data != nil {
