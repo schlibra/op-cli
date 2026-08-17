@@ -41,7 +41,7 @@ func (pw *ProgressWriter) render() {
 			bar = strings.Repeat("=", completed) + ">" + strings.Repeat(" ", barWidth-completed-1)
 		}
 	} else {
-		bar = "大小未知..."
+		bar = "unknown size..."
 	}
 
 	// 计算瞬时下载速度
@@ -65,18 +65,18 @@ func DownloadWithProgressBar(url, savePath string) error {
 	// 1. 发起 GET 请求
 	resp, err := http.Get(url)
 	if err != nil {
-		return fmt.Errorf("请求失败: %w", err)
+		return fmt.Errorf("request error: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("下载失败，状态码: %s", resp.Status)
+		return fmt.Errorf("download error, status code: %s", resp.Status)
 	}
 
 	// 2. 创建本地文件
 	out, err := os.Create(savePath)
 	if err != nil {
-		return fmt.Errorf("创建文件失败: %w", err)
+		return fmt.Errorf("create file error: %w", err)
 	}
 	defer out.Close()
 
@@ -89,10 +89,10 @@ func DownloadWithProgressBar(url, savePath string) error {
 	// 4. 使用 io.TeeReader 同时向文件和进度条分发数据流
 	_, err = io.Copy(out, io.TeeReader(resp.Body, pw))
 	if err != nil {
-		return fmt.Errorf("写入失败: %w", err)
+		return fmt.Errorf("write error: %w", err)
 	}
 
-	fmt.Println("\n下载完成！")
+	fmt.Println("\ndownload finish！")
 	return nil
 }
 

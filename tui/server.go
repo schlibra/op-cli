@@ -1,77 +1,87 @@
 package tui
 
 import (
+	"fmt"
 	"log"
 	"op-cli/utils"
 	"os"
-	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/charmbracelet/huh"
 )
-
-func setBaseURL() {
-	var baseUrl = ""
-	config, err := utils.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = survey.AskOne(&survey.Input{
-		Message: "Input new base url: ",
-	}, &baseUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-	baseUrl = strings.TrimSuffix(baseUrl, "/")
-	config.BaseURL = baseUrl
-	err = utils.SaveConfig(config)
-	if err != nil {
-		log.Fatal(err)
-	}
-	baseURL()
-}
 
 func baseURL() {
 	config, err := utils.LoadConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-	var action = ""
-	err = survey.AskOne(&survey.Select{
-		Message: "Server Base URL: " + config.BaseURL,
-		Options: []string{"Set URL", "Back", "Home", "Quit"},
-		Default: "Back",
-	}, &action)
+	baseUrl := config.BaseURL
+	var action string
+	err = huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Base URL: ").
+				Value(&baseUrl),
+			huh.NewSelect[string]().
+				Title("Base URL setting").
+				Options(
+					huh.NewOption("Save", "save"),
+					huh.NewOption("Back", "back"),
+					huh.NewOption("Home", "home"),
+					huh.NewOption("Quit", "quit"),
+				).
+				Value(&action),
+		),
+	).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 	switch action {
-	case "Set URL":
-		setBaseURL()
-	case "Back":
+	case "save":
+		config.BaseURL = baseUrl
+		err = utils.SaveConfig(config)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Save success")
 		Server()
-	case "Home":
+	case "back":
+		Server()
+	case "home":
 		Home()
-	case "Quit":
+	case "quit":
 		os.Exit(0)
+	default:
+		baseURL()
 	}
 }
 
 func Server() {
-	var action = ""
-	err := survey.AskOne(&survey.Select{
-		Message: "Server setting",
-		Options: []string{"Base URL", "Back", "Quit"},
-		Default: "Back",
-	}, &action)
+	config, err := utils.LoadConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	var action string
+	err = huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Server setting").
+				Options(
+					huh.NewOption("BaseURL: "+config.BaseURL, "baseUrl"),
+					huh.NewOption("Back", "back"),
+					huh.NewOption("Quit", "quit"),
+				).
+				Value(&action),
+		),
+	).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 	switch action {
-	case "Base URL":
+	case "baseUrl":
 		baseURL()
-	case "Back":
+	case "back":
 		Home()
-	case "Quit":
+	case "quit":
 		os.Exit(0)
 	}
 }

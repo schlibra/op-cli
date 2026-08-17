@@ -1,29 +1,40 @@
 package tui
 
 import (
+	"log"
 	"os"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/charmbracelet/huh"
 )
 
 func Home() {
-	var action = ""
-	err := survey.AskOne(&survey.Select{
-		Message: "Select Action",
-		Options: []string{"Server", "Auth", "File", "Exit", "About", "Quit"},
-		Default: "Server",
-	}, &action)
+	var action string
+	err := huh.NewSelect[string]().
+		Title("Select Action").
+		Options(
+			huh.NewOption("Server setting", "server"),
+			huh.NewOption("Auth setting", "auth"),
+			huh.NewOption("File browser", "file"),
+			huh.NewOption("About program", "about"),
+			huh.NewOption("Quit program", "quit"),
+		).
+		Value(&action).
+		Run()
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 	switch action {
-	case "Server":
+	case "server":
 		Server()
-	case "Auth":
+	case "auth":
 		Auth()
-	case "About":
+	case "file":
+		File("/")
+	case "about":
 		About()
-	case "Quit":
+	case "quit":
 		os.Exit(0)
+	default:
+		Home()
 	}
 }

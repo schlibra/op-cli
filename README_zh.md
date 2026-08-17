@@ -12,14 +12,16 @@
 - 按路径列出文件和目录。
 - 查看文件或目录的元数据。
 - 使用进度条下载文件。
+- 在交互式文件浏览器中浏览目录、查看文件信息并发起下载。
 - 显示版本号、Git 提交和构建时间。
-- 为 Linux、macOS 和 Windows 构建静态二进制文件。
+- 为 Linux、macOS、Windows、BSD 及其他类 Unix 平台构建静态二进制文件。
 
 ## 环境要求
 
 - Go 1.26.6 或兼容版本；具体版本声明在 `go.mod` 中。
 - 一个提供本客户端所需 API 的 OpenList 服务器。
 - 使用交互式菜单时，需要支持终端输入。
+- 仅使用 Makefile 构建目标时需要 GNU Make。
 
 当前客户端调用以下 OpenList 接口：
 
@@ -38,32 +40,50 @@
 ### 本地构建
 
 ```bash
+mkdir -p dist
 go build -o dist/op-cli .
 ```
 
 Windows 下可以使用 `.exe` 后缀：
 
 ```powershell
+New-Item -ItemType Directory -Force dist | Out-Null
 go build -o dist/op-cli.exe .
 ```
 
 ### 构建全部目标平台
 
 ```bash
-make build-all
+make all-platform
 ```
 
-二进制文件会写入 `dist/`，文件名如下：
+Makefile 还提供以下构建目标：
+
+| 目标 | 说明 |
+| --- | --- |
+| `make current` | 构建当前主机平台，输出 `dist/op-cli-current`（Windows 下为 `.exe`），并写入版本元数据。 |
+| `make all-platform` | 构建 Makefile 中声明的全部平台组。 |
+| `make all` 或 `make` | 同时构建当前平台和全部平台目标。 |
+| `make clean` | 删除 `dist/` 输出目录。 |
+
+跨平台文件使用 `op-cli-<goos>-<goarch>` 命名。当前目标组包括：
+
+- Linux：`amd64`、`386`、`arm64`、`arm`、`riscv64`、`ppc64`、`ppc64le`、`s390x` 和 `loong64`。
+- macOS：`amd64` 和 `arm64`。
+- Windows：`amd64`、`386` 和 `arm64`。
+- FreeBSD、OpenBSD 和 NetBSD：以 `Makefile` 中声明的架构为准。
+- DragonFly BSD、Solaris 和 illumos：以 `Makefile` 中声明的架构为准。
+- Makefile 中还存在 Android 名称的目标；分发前请阅读[已知限制](#已知限制)。
+
+初始目标集会生成例如以下文件：
 
 ```text
 op-cli-linux-amd64
-op-cli-linux-arm64
 op-cli-darwin-amd64
-op-cli-darwin-arm64
 op-cli-windows-amd64.exe
 ```
 
-当前 `make build` 配方仍是占位实现；构建单个平台请使用 `go build`，构建上述全部平台请使用 `make build-all`。
+所有跨平台配方均使用 `CGO_ENABLED=0`。构建全部目标会比构建当前平台耗时更长。
 
 ## 快速开始
 
@@ -91,7 +111,14 @@ op-cli-windows-amd64.exe
 ./op-cli
 ```
 
-当前菜单可以配置服务器地址、进行认证和查看版本信息。首页虽然显示了 `File` 选项，但该选项尚未接入具体操作；文件浏览和下载请使用命令行命令。
+交互式菜单提供以下功能：
+
+- **Server setting**：查看并保存 OpenList Base URL。
+- **Auth setting**：登录、登出和查询当前用户；登录表单支持可选 TOTP 验证码。
+- **File browser**：浏览目录、返回上级目录、查看文件元数据并下载文件。
+- **About program**：查看版本号、Git 提交和构建时间。
+
+当前源码中的 CLI 登录参数下标检查仍有误，文档中的 CLI 登录命令可能触发 index-out-of-range；在依赖 CLI 登录前请使用交互式登录或先修复 `cmd/root.go`。
 
 ## 命令参考
 
@@ -138,15 +165,18 @@ token = "<access-token>"
 ```bash
 gofmt -w main.go cmd/root.go model/*.go tui/*.go utils/*.go
 go test ./...
+make current
 ```
 
-项目当前没有测试用例。使用 `make build-all` 时，会通过链接参数写入 `Version`、`GitCommit` 和 `BuildTime`。
+项目当前没有测试用例。Makefile 构建会通过链接参数写入 `Version`、`GitCommit` 和 `BuildTime`；直接使用 `go build` 不会写入这些值。
 
 ## 已知限制
 
 - 客户端依赖上文列出的 OpenList 接口路径和响应结构。
 - 底层请求模型包含密码、分页和刷新字段，但 CLI 尚未提供对应参数。
-- 当前源码中的 CLI 登录参数下标检查有误，按文档执行 `login <username> <password>` 可能触发 index-out-of-range；在依赖 CLI 登录前请先修复 `cmd/root.go`。
+- 当前源码中的 CLI 登录参数下标检查有误，按文档执行 `login <username> <password>` 可能触发 index-out-of-range；请先使用交互式登录或修复 `cmd/root.go`。
+- Makefile 中的 `android-*` 配方当前实际设置的是 `GOOS=linux`，生成的是带 Android 文件名的 Linux 二进制，并非原生 Android 二进制。
+- 构建全部平台需要兼容的 Go 工具链，部分目标可能不受本地 Go 版本支持。
 
 ## 许可证
 

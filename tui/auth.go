@@ -6,7 +6,7 @@ import (
 	"op-cli/utils"
 	"os"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/charmbracelet/huh"
 )
 
 func userLogin() {
@@ -15,41 +15,62 @@ func userLogin() {
 		password = ""
 		totp     = ""
 	)
-	err := survey.AskOne(&survey.Input{
-		Message: "Input username:",
-	}, &username)
+	var action string
+	err := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Username: ").
+				Value(&username),
+			huh.NewInput().
+				EchoMode(huh.EchoModePassword).
+				Title("Password: ").
+				Value(&password),
+			huh.NewInput().
+				Title("Totp(If enabled): ").
+				Value(&totp),
+			huh.NewSelect[string]().
+				Title("Select action: ").
+				Options(
+					huh.NewOption("Login user", "login"),
+					huh.NewOption("Back", "back"),
+					huh.NewOption("Home", "home"),
+					huh.NewOption("Quit", "quit"),
+				).
+				Value(&action),
+		).Title("Login user"),
+	).Run()
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = survey.AskOne(&survey.Password{
-		Message: "Input password:",
-	}, &password)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = survey.AskOne(&survey.Input{
-		Message: "Input TOTP Code(If enabled):",
-	}, &totp)
-	if err != nil {
-		log.Fatal(err)
-	}
-	data := utils.SendUserLogin(username, password, totp)
-	if data.Code == 200 {
-		fmt.Println("Login success")
-		token := data.Data.Token
-		config, err := utils.LoadConfig()
-		if err != nil {
-			log.Fatal(err)
+	switch action {
+	case "login":
+		data := utils.SendUserLogin(username, password, totp)
+		if data.Code == 200 {
+			fmt.Println("Login success")
+			token := data.Data.Token
+			config, err := utils.LoadConfig()
+			if err != nil {
+				log.Fatal(err)
+			}
+			config.Token = token
+			err = utils.SaveConfig(config)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			fmt.Println("Login failed: " + data.Message)
 		}
-		config.Token = token
-		err = utils.SaveConfig(config)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		fmt.Println("Login failed: " + data.Message)
+		Auth()
+	case "back":
+		Auth()
+	case "home":
+		Home()
+	case "quit":
+		os.Exit(0)
+	default:
+		userLogin()
 	}
-	Auth()
+
 }
 func userInfo() {
 	userInfoData := utils.SendUserInfo()
@@ -70,34 +91,33 @@ func userLogout() {
 }
 
 func Auth() {
-	config, err := utils.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if config.BaseURL == "" {
-		fmt.Println("Base URL not set")
-		Home()
-		return
-	}
-	var action = ""
-	err = survey.AskOne(&survey.Select{
-		Message: "Auth setting ",
-		Options: []string{"Login", "Logout", "Info", "Back", "Quit"},
-		Default: "Login",
-	}, &action)
+	var action string
+	err := huh.NewSelect[string]().
+		Title("Auth setting").
+		Options(
+			huh.NewOption("Login user", "login"),
+			huh.NewOption("Logout user", "logout"),
+			huh.NewOption("User info", "info"),
+			huh.NewOption("Back", "back"),
+			huh.NewOption("Quit", "quit"),
+		).
+		Value(&action).
+		Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 	switch action {
-	case "Login":
+	case "login":
 		userLogin()
-	case "Logout":
+	case "logout":
 		userLogout()
-	case "Info":
+	case "info":
 		userInfo()
-	case "Back":
+	case "back":
 		Home()
-	case "Quit":
+	case "quit":
 		os.Exit(0)
+	default:
+		Auth()
 	}
 }

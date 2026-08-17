@@ -12,14 +12,16 @@
 - List files and directories under a path.
 - Inspect file or directory metadata.
 - Download a file with a progress bar.
+- Browse directories, inspect files, and start downloads from the interactive file browser.
 - Show build version, commit, and build time information.
-- Build static binaries for Linux, macOS, and Windows.
+- Build static binaries for Linux, macOS, Windows, BSD, and other Unix-like targets.
 
 ## Requirements
 
 - Go 1.26.6 or a compatible Go toolchain. The required version is declared in `go.mod`.
 - An OpenList server exposing the API endpoints used by this client.
 - A terminal that supports interactive input for menu mode.
+- GNU Make is required only for the Makefile-based build targets.
 
 The client currently calls these OpenList endpoints:
 
@@ -38,32 +40,50 @@ Use a base URL such as `https://openlist.example.com` without a trailing slash. 
 ### Build locally
 
 ```bash
+mkdir -p dist
 go build -o dist/op-cli .
 ```
 
 On Windows, use an `.exe` suffix if desired:
 
 ```powershell
+New-Item -ItemType Directory -Force dist | Out-Null
 go build -o dist/op-cli.exe .
 ```
 
 ### Cross-compile all targets
 
 ```bash
-make build-all
+make all-platform
 ```
 
-The binaries are written to `dist/` with these names:
+The Makefile also provides these build targets:
+
+| Target | Description |
+| --- | --- |
+| `make current` | Build the current host platform as `dist/op-cli-current` (or `.exe` on Windows), embedding version metadata. |
+| `make all-platform` | Build every platform group declared by the Makefile. |
+| `make all` or `make` | Build the current platform and all declared platform targets. |
+| `make clean` | Remove the `dist/` output directory. |
+
+Cross-compiled files use the `op-cli-<goos>-<goarch>` naming pattern. The current target groups are:
+
+- Linux: `amd64`, `386`, `arm64`, `arm`, `riscv64`, `ppc64`, `ppc64le`, `s390x`, and `loong64`.
+- macOS: `amd64` and `arm64`.
+- Windows: `amd64`, `386`, and `arm64`.
+- FreeBSD, OpenBSD, and NetBSD: the architectures declared in `Makefile`.
+- DragonFly BSD, Solaris, and illumos: the architectures declared in `Makefile`.
+- Android-named targets are present in the Makefile; see [Known limitations](#known-limitations) before distributing them.
+
+For example, the initial target set produces files such as:
 
 ```text
 op-cli-linux-amd64
-op-cli-linux-arm64
 op-cli-darwin-amd64
-op-cli-darwin-arm64
 op-cli-windows-amd64.exe
 ```
 
-The `make build` recipe is currently a placeholder; use `go build` for a single native binary or `make build-all` for all listed targets.
+All cross-platform recipes use `CGO_ENABLED=0`. Building every target may take considerably longer than a native build.
 
 ## Quick start
 
@@ -91,7 +111,14 @@ Run the program without arguments to open the interactive menu:
 ./op-cli
 ```
 
-The menu currently exposes server URL, authentication, and about/version screens. A `File` option is displayed in the home menu but is not wired to an action yet; use the command-line file commands for browsing and downloads.
+The interactive menu provides:
+
+- **Server setting**: view and save the OpenList Base URL.
+- **Auth setting**: log in, log out, or query the current user. The login form accepts an optional TOTP code.
+- **File browser**: navigate directories, move to the parent directory, view file metadata, and download files.
+- **About program**: view version, Git commit, and build time.
+
+The CLI login argument validation in the current source is still incorrect. The documented CLI login form may fail with an index-out-of-range error; use the interactive login form or fix `cmd/root.go` before relying on CLI login.
 
 ## Command reference
 
@@ -138,15 +165,18 @@ Format and test the project with:
 ```bash
 gofmt -w main.go cmd/root.go model/*.go tui/*.go utils/*.go
 go test ./...
+make current
 ```
 
-There are currently no project tests. The build embeds `Version`, `GitCommit`, and `BuildTime` through linker flags when using `make build-all`.
+There are currently no project tests. Makefile builds embed `Version`, `GitCommit`, and `BuildTime` through linker flags; a direct `go build` does not set these values.
 
 ## Known limitations
 
 - The client is coupled to the OpenList response shapes and endpoint paths listed above.
 - File listing and metadata requests do not expose password, pagination, or refresh options through the CLI, even though the underlying request models contain those fields.
-- The CLI login argument indexes are currently checked incorrectly. Running the documented `login <username> <password>` form can produce an index-out-of-range error; fix `cmd/root.go` before relying on CLI login.
+- The CLI login argument indexes are currently checked incorrectly. Running the documented `login <username> <password>` form can produce an index-out-of-range error; use interactive login or fix `cmd/root.go` first.
+- The `android-*` Makefile recipes currently set `GOOS=linux`, so their output is Linux code with Android-style filenames rather than native Android binaries.
+- Cross-compiling every target requires a compatible Go toolchain and can fail for targets not supported by the local Go release.
 
 ## License
 
