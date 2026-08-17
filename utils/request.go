@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"op-cli/model"
@@ -61,7 +62,12 @@ func SendUserLogin(username string, password string, totp string) *model.UserLog
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
 	if resp.StatusCode == 200 {
 		fmt.Println("Successfully logged in")
 		var result model.UserLoginResponse
@@ -80,7 +86,12 @@ func SendUserInfo() *model.UserInfo {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
 	if resp.StatusCode == 200 {
 		var result model.UserInfo
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -94,7 +105,13 @@ func SendUserInfo() *model.UserInfo {
 func SendUserLogout() {
 	baseUrl := getBaseUrl()
 	setToken(getToken())
-	_, _ = http.Post(baseUrl+"/api/auth/logout", "application/json", nil)
+	resp, _ := http.Post(baseUrl+"/api/auth/logout", "application/json", nil)
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
 	config, err := LoadConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -116,7 +133,12 @@ func SendListFilePath(filePath string) model.FileListResponse {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
 	var result model.FileListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		log.Fatal(err)
@@ -137,7 +159,12 @@ func SendGetFilePath(filePath string) model.FileInfoResponse {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(resp.Body)
 	var result model.FileInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		log.Fatal(err)
