@@ -88,7 +88,7 @@ func SendUserInfo() *model.UserInfo {
 		}
 		return &result
 	}
-	fmt.Println("Failed to get user info")
+	log.Fatal("Failed to get user info: " + resp.Status)
 	return nil
 }
 func SendUserLogout() {

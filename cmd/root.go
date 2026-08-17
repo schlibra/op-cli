@@ -61,10 +61,12 @@ func login() {
 }
 func info() {
 	data := utils.SendUserInfo()
-	if data.Code == 200 {
-		fmt.Printf("Username:\t%s\nBasePath:\t%s\nRole:\t\t%d\nPermission:\t%d\n", data.Data.Username, data.Data.BasePath, data.Data.Role, data.Data.Permission)
-	} else {
-		fmt.Printf("User info get error: %s\n", data.Message)
+	if data != nil {
+		if data.Code == 200 {
+			fmt.Printf("Username:\t%s\nBasePath:\t%s\nRole:\t\t%d\nPermission:\t%d\n", data.Data.Username, data.Data.BasePath, data.Data.Role, data.Data.Permission)
+		} else {
+			fmt.Printf("User info get error: %s\n", data.Message)
+		}
 	}
 }
 func logout() {
