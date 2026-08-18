@@ -11,8 +11,9 @@
 - Query the current user's profile and log out.
 - List files and directories under a path.
 - Inspect file or directory metadata.
-- Download files with a live progress bar.
+- Download files with a live progress bar from the interactive file browser.
 - Browse directories, inspect files, and start downloads from the interactive file browser.
+- Use a structured Cobra command tree with built-in help and shell completion.
 - Show the program version, Git commit, and build time.
 - Build binaries for the platform targets declared in the Makefile, including native Android builds through the Android NDK.
 
@@ -135,13 +136,13 @@ The examples below assume the binary is available as `./op-cli` (`.\op-cli.exe` 
 1. Set the OpenList server URL:
 
    ```bash
-   ./op-cli url https://openlist.example.com
+   ./op-cli url set https://openlist.example.com
    ```
 
 2. Log in from the command line. Append a TOTP code when the account requires it:
 
    ```bash
-   ./op-cli login <username> <password> [totp-code]
+   ./op-cli user login <username> <password> [totp-code]
    ```
 
    Alternatively, run `./op-cli` and choose **Auth setting** > **Login user** to use the interactive login form.
@@ -150,28 +151,44 @@ The examples below assume the binary is available as `./op-cli` (`.\op-cli.exe` 
 
    ```bash
    ./op-cli ls /
-   ./op-cli get /documents/report.pdf
-   ./op-cli download /documents/report.pdf
+   ./op-cli file /documents/report.pdf
    ```
 
-Run `./op-cli help` for the built-in usage text. Running the program without arguments always opens the interactive menu.
+Run `./op-cli --help` for the Cobra command tree or `./op-cli <command> --help` for command-specific usage. Running the program without arguments always opens the interactive menu.
 
 ## Command reference
 
 | Command | Description |
 | --- | --- |
-| `url <base-url>` | Set the OpenList server base URL. |
-| `url get` or `url info` | Print the configured base URL. |
-| `login <username> <password> [totp-code]` | Authenticate and save the returned token. |
-| `logout` | Log out and clear the locally stored token. |
-| `info` | Show the current user's username, base path, role, and permission. |
+| `url get` | Print the configured OpenList server base URL. |
+| `url set <base-url>` | Set the OpenList server base URL. |
+| `user login <username> <password> [totp]` | Authenticate and save the returned token. |
+| `user logout` | Log out and clear the locally stored token. |
+| `user info` | Show the current user's username, base path, role, and permission. |
 | `ls [path]` | List a directory. The default path is `/`. |
-| `get [path]` | Show file or directory metadata and its raw URL. The default path is `/`. |
-| `download [path]` | Download a file to the current directory using the server-provided name. `dl` and `down` are aliases. |
-| `version` | Show version, Git commit, and build time. `-v` is an alias. |
-| `help` | Show the built-in usage text. |
+| `file <path>` | Show file or directory metadata and its raw URL. |
+| `download <path>` | Intended to download a file; the current handler only displays metadata. See [Known limitations](#known-limitations). |
+| `version` | Show version, Git commit, and build time. |
+| `completion <shell>` | Generate a completion script for Bash, Fish, PowerShell, or Zsh. |
+| `help` or `--help` | Show the command tree or command-specific usage. |
 
-The command dispatcher also accepts the corresponding `-command` and `--command` spellings, including the download aliases.
+Commands and subcommands support `-h` and `--help`. The earlier flat commands and their `-command`/`--command`, `dl`, `down`, and `-v` aliases are no longer registered by the Cobra command tree.
+
+### Shell completion
+
+Generate a completion script for the shell you use:
+
+```bash
+./op-cli completion bash > op-cli.bash
+./op-cli completion fish > op-cli.fish
+./op-cli completion zsh > _op-cli
+```
+
+On PowerShell:
+
+```powershell
+.\op-cli.exe completion powershell | Out-String | Invoke-Expression
+```
 
 ## Configuration and authentication
 
@@ -192,23 +209,25 @@ The access token is stored locally in plain text. Protect this file and never co
 
 ## Downloads
 
-`download` first requests file metadata from `/api/fs/get`, then downloads the returned `raw_url` into the current working directory. The output filename comes from the server. `os.Create` overwrites an existing file with the same name. Downloads are streamed and show a progress bar; resume, checksum verification, and a custom output path are not currently supported.
+The interactive file browser receives a server-provided `raw_url`, then streams the file into the current working directory with a progress bar. The output filename comes from the server, and `os.Create` overwrites an existing file with the same name.
+
+The current Cobra `download <path>` handler calls the file metadata function instead of the download function, so it displays metadata without creating a file. See [Known limitations](#known-limitations).
 
 ## Network behavior
 
-At startup the program configures Go's default resolver to use the public DNS server `223.5.5.5` over UDP. Environments that block this server or require an internal DNS resolver may therefore be unable to resolve the OpenList host. Adjust `utils/dns.go` if your deployment needs different DNS behavior.
+OpenList API requests use Resty v3. Authenticated requests send the locally stored token in the `Authorization` header. The client uses the operating system's normal DNS configuration and no longer overrides Go's default resolver.
 
 ## Development
 
 Format, test, and build the project with:
 
 ```bash
-gofmt -w main.go cmd/root.go model/*.go tui/*.go utils/*.go
+gofmt -w main.go cmd/*.go model/*.go tui/*.go utils/*.go
 go test ./...
 make current
 ```
 
-The repository currently has no automated test files. Makefile builds embed `Version`, `GitCommit`, and `BuildTime` through linker flags; a direct `go build` leaves those values empty.
+The repository currently has no automated test files. Cobra provides the CLI command tree, Resty v3 handles OpenList API requests, and Charmbracelet Huh provides the interactive UI. Makefile builds embed `Version`, `GitCommit`, and `BuildTime` through linker flags; a direct `go build` leaves those values empty.
 
 ## Known limitations
 

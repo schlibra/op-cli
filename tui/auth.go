@@ -74,13 +74,11 @@ func userLogin() {
 }
 func userInfo() {
 	userInfoData := utils.SendUserInfo()
-	if userInfoData != nil {
-		if userInfoData.Code == 200 {
-			fmt.Println("Username: " + userInfoData.Data.Username)
-			fmt.Printf("Role: %d\n", userInfoData.Data.Role)
-		} else {
-			fmt.Println("User info get error: " + userInfoData.Message)
-		}
+	if userInfoData.Code == 200 {
+		fmt.Println("Username: " + userInfoData.Data.Username)
+		fmt.Printf("Role: %d\n", userInfoData.Data.Role)
+	} else {
+		fmt.Println("User info get error: " + userInfoData.Message)
 	}
 	Auth()
 }

@@ -1,30 +1,31 @@
 package utils
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"op-cli/model"
+
+	"resty.dev/v3"
 )
 
-type authTransport struct {
-	token     string
-	transport http.RoundTripper
+func deferCloseClient(client *resty.Client) {
+	defer func(client *resty.Client) {
+		err := client.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(client)
 }
 
-func (t *authTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
-	req.Header.Set("Authorization", t.token)
-	return t.transport.RoundTrip(req)
+func e(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func getBaseUrl() string {
 	config, err := LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	e(err)
 	if config.BaseURL == "" {
 		fmt.Println("Base URL not set")
 	}
@@ -32,142 +33,79 @@ func getBaseUrl() string {
 }
 func getToken() string {
 	config, err := LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	e(err)
 	return config.Token
 }
 
-func setToken(token string) {
-	http.DefaultClient.Transport = &authTransport{
-		token:     token,
-		transport: http.DefaultTransport,
-	}
-}
-
-func SendUserLogin(username string, password string, totp string) *model.UserLoginResponse {
+func SendUserLogin(username string, password string, totp string) model.UserLoginResponse {
 	baseUrl := getBaseUrl()
-	authData := model.UserLoginRequest{
-		Username: username,
-		Password: password,
-	}
-	if totp != "" {
-		authData.Totp = totp
-	}
-	jsonData, err := json.Marshal(authData)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resp, err := http.Post(baseUrl+"/api/auth/login", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
-	if resp.StatusCode == 200 {
-		fmt.Println("Successfully logged in")
-		var result model.UserLoginResponse
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			log.Fatal(err)
-		}
-		return &result
-	}
-	fmt.Println("Failed to login")
-	return nil
+	client := resty.New()
+	deferCloseClient(client)
+	var result model.UserLoginResponse
+	_, err := client.R().
+		SetBody(model.UserLoginRequest{
+			Username: username,
+			Password: password,
+			Totp:     totp,
+		}).
+		SetResult(&result).
+		Post(baseUrl + "/api/auth/login")
+	e(err)
+	return result
 }
-func SendUserInfo() *model.UserInfo {
+func SendUserInfo() model.UserInfo {
 	baseUrl := getBaseUrl()
-	setToken(getToken())
-	resp, err := http.Get(baseUrl + "/api/me")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
-	if resp.StatusCode == 200 {
-		var result model.UserInfo
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			log.Fatal(err)
-		}
-		return &result
-	}
-	log.Fatal("Failed to get user info: " + resp.Status)
-	return nil
+	client := resty.New()
+	deferCloseClient(client)
+	var result model.UserInfo
+	_, err := client.R().
+		SetHeader("Authorization", getToken()).
+		SetResult(&result).
+		Get(baseUrl + "/api/me")
+	e(err)
+	return result
 }
 func SendUserLogout() {
 	baseUrl := getBaseUrl()
-	setToken(getToken())
-	resp, _ := http.Post(baseUrl+"/api/auth/logout", "application/json", nil)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
+	client := resty.New()
+	deferCloseClient(client)
+	_, err := client.R().
+		SetHeader("Authorization", getToken()).
+		Post(baseUrl + "/api/auth/logout")
+	e(err)
 	config, err := LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
+	e(err)
 	config.Token = ""
-	_ = SaveConfig(config)
+	err = SaveConfig(config)
+	e(err)
 }
 func SendListFilePath(filePath string) model.FileListResponse {
 	baseUrl := getBaseUrl()
-	setToken(getToken())
-	fileData := model.FileListRequest{
-		Path: filePath,
-	}
-	jsonData, err := json.Marshal(fileData)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resp, err := http.Post(baseUrl+"/api/fs/list", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
+	client := resty.New()
+	deferCloseClient(client)
 	var result model.FileListResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatal(err)
-	}
+	_, err := client.R().
+		SetBody(model.FileListRequest{
+			Path: filePath,
+		}).
+		SetHeader("Authorization", getToken()).
+		SetResult(&result).
+		Post(baseUrl + "/api/fs/list")
+	e(err)
 	return result
 }
 func SendGetFilePath(filePath string) model.FileInfoResponse {
 	baseUrl := getBaseUrl()
-	setToken(getToken())
-	fileData := model.FileInfoRequest{
-		Path: filePath,
-	}
-	jsonData, err := json.Marshal(fileData)
-	if err != nil {
-		log.Fatal(err)
-	}
-	resp, err := http.Post(baseUrl+"/api/fs/get", "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(resp.Body)
+	client := resty.New()
+	deferCloseClient(client)
 	var result model.FileInfoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Fatal(err)
-	}
+	_, err := client.R().
+		SetBody(model.FileInfoRequest{
+			Path: filePath,
+		}).
+		SetHeader("Authorization", getToken()).
+		SetResult(&result).
+		Post(baseUrl + "/api/fs/get")
+	e(err)
 	return result
 }

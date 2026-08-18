@@ -11,8 +11,9 @@
 - 查询当前用户信息并登出。
 - 按路径列出文件和目录。
 - 查看文件或目录的元数据。
-- 使用实时进度条下载文件。
+- 在交互式文件浏览器中使用实时进度条下载文件。
 - 在交互式文件浏览器中浏览目录、查看文件信息并发起下载。
+- 使用结构化的 Cobra 命令树，并提供内置帮助和 Shell 补全。
 - 显示程序版本、Git 提交和构建时间。
 - 根据 Makefile 中声明的平台目标构建二进制文件，包括通过 Android NDK 构建原生 Android 二进制。
 
@@ -135,13 +136,13 @@ Windows 下请使用 Git Bash、MSYS2、WSL 或其他提供 Makefile 所需 POSI
 1. 设置 OpenList 服务器地址：
 
    ```bash
-   ./op-cli url https://openlist.example.com
+   ./op-cli url set https://openlist.example.com
    ```
 
 2. 使用命令行登录；如果账户启用了 TOTP，请在末尾添加验证码：
 
    ```bash
-   ./op-cli login <username> <password> [totp-code]
+   ./op-cli user login <username> <password> [totp-code]
    ```
 
    也可以运行 `./op-cli`，然后选择 **Auth setting** > **Login user** 使用交互式登录表单。
@@ -150,28 +151,44 @@ Windows 下请使用 Git Bash、MSYS2、WSL 或其他提供 Makefile 所需 POSI
 
    ```bash
    ./op-cli ls /
-   ./op-cli get /documents/report.pdf
-   ./op-cli download /documents/report.pdf
+   ./op-cli file /documents/report.pdf
    ```
 
-运行 `./op-cli help` 可查看内置用法说明。不带参数运行程序时始终进入交互式菜单。
+运行 `./op-cli --help` 可查看 Cobra 命令树，使用 `./op-cli <command> --help` 可查看具体命令的用法。不带参数运行程序时始终进入交互式菜单。
 
 ## 命令参考
 
 | 命令 | 说明 |
 | --- | --- |
-| `url <base-url>` | 设置 OpenList 服务器 Base URL。 |
-| `url get` 或 `url info` | 输出当前配置的 Base URL。 |
-| `login <username> <password> [totp-code]` | 登录并保存服务器返回的令牌。 |
-| `logout` | 登出并清除本地保存的令牌。 |
-| `info` | 显示当前用户的用户名、基础路径、角色和权限。 |
+| `url get` | 输出当前配置的 OpenList 服务器 Base URL。 |
+| `url set <base-url>` | 设置 OpenList 服务器 Base URL。 |
+| `user login <username> <password> [totp]` | 登录并保存服务器返回的令牌。 |
+| `user logout` | 登出并清除本地保存的令牌。 |
+| `user info` | 显示当前用户的用户名、基础路径、角色和权限。 |
 | `ls [path]` | 列出目录内容；路径省略时默认为 `/`。 |
-| `get [path]` | 显示文件或目录元数据及原始 URL；路径省略时默认为 `/`。 |
-| `download [path]` | 将文件下载到当前目录，并使用服务器返回的文件名；`dl` 和 `down` 是别名。 |
-| `version` | 显示版本号、Git 提交和构建时间；`-v` 是别名。 |
-| `help` | 显示内置用法说明。 |
+| `file <path>` | 显示文件或目录元数据及原始 URL。 |
+| `download <path>` | 设计用途为下载文件；当前处理器只显示元数据，详见[已知限制](#已知限制)。 |
+| `version` | 显示版本号、Git 提交和构建时间。 |
+| `completion <shell>` | 为 Bash、Fish、PowerShell 或 Zsh 生成补全脚本。 |
+| `help` 或 `--help` | 显示命令树或具体命令的用法。 |
 
-命令分发器也接受对应的 `-command` 和 `--command` 写法，包括下载命令的别名。
+所有命令和子命令都支持 `-h` 和 `--help`。Cobra 命令树不再注册旧的扁平命令以及对应的 `-command`/`--command`、`dl`、`down` 和 `-v` 别名。
+
+### Shell 补全
+
+根据使用的 Shell 生成补全脚本：
+
+```bash
+./op-cli completion bash > op-cli.bash
+./op-cli completion fish > op-cli.fish
+./op-cli completion zsh > _op-cli
+```
+
+PowerShell：
+
+```powershell
+.\op-cli.exe completion powershell | Out-String | Invoke-Expression
+```
 
 ## 配置与认证
 
@@ -192,23 +209,25 @@ token = "<access-token>"
 
 ## 下载行为
 
-`download` 会先请求 `/api/fs/get` 获取文件元数据，再将返回的 `raw_url` 下载到当前工作目录。输出文件名来自服务器；如果同名文件已存在，`os.Create` 会覆盖它。下载采用流式传输并显示进度条，目前不支持断点续传、校验和或自定义输出路径。
+交互式文件浏览器接收服务器返回的 `raw_url`，再使用进度条将文件流式写入当前工作目录。输出文件名来自服务器；如果同名文件已存在，`os.Create` 会覆盖它。
+
+当前 Cobra `download <path>` 处理器调用的是文件元数据函数，而不是下载函数，因此只会显示元数据，不会创建文件。详见[已知限制](#已知限制)。
 
 ## 网络行为
 
-程序启动时会将 Go 默认 DNS 解析器设置为公共 DNS `223.5.5.5`，并通过 UDP 使用该服务器。若当前网络屏蔽此 DNS 或要求使用内网 DNS，OpenList 主机名可能无法解析。需要其他 DNS 行为时，请调整 `utils/dns.go`。
+OpenList API 请求使用 Resty v3。需要认证的请求会在 `Authorization` 请求头中发送本地保存的令牌。客户端使用操作系统的常规 DNS 配置，不再覆盖 Go 默认解析器。
 
 ## 开发
 
 可以使用以下命令格式化、测试和构建项目：
 
 ```bash
-gofmt -w main.go cmd/root.go model/*.go tui/*.go utils/*.go
+gofmt -w main.go cmd/*.go model/*.go tui/*.go utils/*.go
 go test ./...
 make current
 ```
 
-仓库当前没有自动化测试文件。Makefile 构建会通过链接参数写入 `Version`、`GitCommit` 和 `BuildTime`；直接执行 `go build` 时这些值会保持为空。
+仓库当前没有自动化测试文件。Cobra 提供 CLI 命令树，Resty v3 负责 OpenList API 请求，Charmbracelet Huh 提供交互式界面。Makefile 构建会通过链接参数写入 `Version`、`GitCommit` 和 `BuildTime`；直接执行 `go build` 时这些值会保持为空。
 
 ## 已知限制
 
